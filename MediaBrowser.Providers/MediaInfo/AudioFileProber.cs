@@ -451,6 +451,13 @@ namespace MediaBrowser.Providers.MediaInfo
                 {
                     audio.SetStudios(new[] { trackPublisher! });
                 }
+
+                var seriesName = GetSanitizedStringTag(AudioBookSeriesTag.GetSeriesName(track.SeriesTitle, track.AdditionalFields), audio.Path);
+                if (!string.IsNullOrWhiteSpace(seriesName)
+                    && (options.ReplaceAllMetadata || string.IsNullOrEmpty(audioBook.SeriesName)))
+                {
+                    audioBook.SeriesName = seriesName;
+                }
             }
 
             TryGetSanitizedAdditionalFields(track, "REPLAYGAIN_TRACK_GAIN", out var trackGainTag);
