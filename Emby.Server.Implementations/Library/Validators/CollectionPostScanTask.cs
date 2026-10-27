@@ -57,13 +57,13 @@ public class CollectionPostScanTask : ILibraryPostScanTask
 
             var startIndex = 0;
             var pagesize = 1000;
+            var seenAudioBooks = new HashSet<(Guid ParentId, string Album)>();
 
             while (true)
             {
                 var movies = _libraryManager.GetItemList(new InternalItemsQuery
                 {
-                    MediaTypes = [MediaType.Video],
-                    IncludeItemTypes = [BaseItemKind.Movie],
+                    IncludeItemTypes = [BaseItemKind.Movie, BaseItemKind.AudioBook],
                     IsVirtualItem = false,
                     OrderBy = [(ItemSortBy.SortName, SortOrder.Ascending)],
                     Parent = library,
@@ -74,15 +74,16 @@ public class CollectionPostScanTask : ILibraryPostScanTask
 
                 foreach (var m in movies)
                 {
-                    if (m is Movie movie && !string.IsNullOrEmpty(movie.CollectionName) && !movie.PrimaryVersionId.HasValue)
+                    var collectionName = GetCollectionName(m, seenAudioBooks);
+                    if (!string.IsNullOrEmpty(collectionName))
                     {
-                        if (collectionNameMoviesMap.TryGetValue(movie.CollectionName, out var movieList))
+                        if (collectionNameMoviesMap.TryGetValue(collectionName, out var movieList))
                         {
-                            movieList.Add(movie.Id);
+                            movieList.Add(m.Id);
                         }
                         else
                         {
-                            collectionNameMoviesMap[movie.CollectionName] = new HashSet<Guid> { movie.Id };
+                            collectionNameMoviesMap[collectionName] = new HashSet<Guid> { m.Id };
                         }
                     }
                 }
@@ -149,5 +150,28 @@ public class CollectionPostScanTask : ILibraryPostScanTask
         }
 
         progress.Report(100);
+    }
+
+    /// <summary>
+    /// Gets the name of the collection an item belongs in.
+    /// </summary>
+    /// <param name="item">A movie or audiobook.</param>
+    /// <param name="seenAudioBooks">Audiobooks already added, by folder and album.</param>
+    /// <returns>The collection name, or <c>null</c> if the item belongs in none.</returns>
+    internal static string? GetCollectionName(BaseItem item, HashSet<(Guid ParentId, string Album)> seenAudioBooks)
+    {
+        if (item is Movie movie)
+        {
+            return movie.PrimaryVersionId.HasValue ? null : movie.CollectionName;
+        }
+
+        if (item is AudioBook audioBook && !string.IsNullOrEmpty(audioBook.SeriesName))
+        {
+            // A book split into several files is one AudioBook per file, all sharing an album and folder.
+            // Only the first file goes into the collection, so the book appears there once.
+            return seenAudioBooks.Add((audioBook.ParentId, audioBook.Album ?? string.Empty)) ? audioBook.SeriesName : null;
+        }
+
+        return null;
     }
 }
