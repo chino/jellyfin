@@ -1630,6 +1630,11 @@ namespace Emby.Server.Implementations.Dto
                 SetBookProperties(dto, book);
             }
 
+            if (item is AudioBook audioBook)
+            {
+                dto.SeriesName = audioBook.SeriesName;
+            }
+
             if (options.ContainsField(ItemFields.ProductionLocations))
             {
                 if (item.ProductionLocations.Length > 0 || item is Movie)
